@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   const baseUrl = process.env.FIREBASE_DB_URL;
   
   if (!baseUrl) {
-    return res.status(500).send("DB URL missing in Vercel settings.");
+    return res.status(500).send("FIREBASE_DB_URL missing in Vercel settings.");
   }
 
   const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
