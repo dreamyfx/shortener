@@ -36,6 +36,7 @@ export default async function handler(req, res) {
       const vpnResponse = await fetch(`https://vpnapi.io/api/${cleanIp}?key=${process.env.VPNAPI_KEY}`);
       vpnData = await vpnResponse.json();
     } catch (e) {
+      console.error('vpnapi.io error:', e);
     }
   }
   
